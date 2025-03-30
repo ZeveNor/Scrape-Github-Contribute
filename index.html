@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Contributions Scraper</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+  <pre id="output"></pre>
+
+  <script>
+    $(document).ready(function () {
+      scrapeContributions();
+
+      function generateDefaultContributions(year) {
+        const contributions = {};
+        const startDate = new Date(`${year}-01-01`);
+        const endDate = new Date(`${year}-12-31`);
+
+        for (let date = startDate; date <= endDate; date.setDate(date.getDate() + 1)) {
+          const formattedDate = date.toISOString().split('T')[0]; 
+          contributions[formattedDate] = {
+            date: formattedDate,
+            dataLevel: 0,
+            amount: 0,
+          };
+        }
+
+        return contributions;
+      }
+
+      function parseDateText(dateText, year) {
+        const months = {
+          January: "01", February: "02", March: "03", April: "04",
+          May: "05", June: "06", July: "07", August: "08",
+          September: "09", October: "10", November: "11", December: "12"
+        };
+
+        const match = dateText.match(/([A-Za-z]+)\s+(\d+)/);
+        if (match) {
+          const month = months[match[1]];
+          const day = match[2].padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        }
+        return null;
+      } 
+
+      async function scrapeContributions() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const year = urlParams.get('year');
+        const username = urlParams.get('userName');
+
+        if (!username || !year) {
+          $('#output').text('enter the correct form of URl Parameters');
+          return;
+        }
+
+        const url = `https://github.com/users/${username}/contributions?tab=overview&from=${year}-01-01&to=${year}-12-31`;
+
+        try {
+          const response = await $.get(url);
+
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(response, 'text/html');
+
+          const contributions = generateDefaultContributions(year);
+
+          $(doc)
+            .find('.ContributionCalendar-day, .sr-only')
+            .each(function () {
+              if ($(this).hasClass('ContributionCalendar-day')) {
+                const date = $(this).attr('data-date');
+                const dataLevel = parseInt($(this).attr('data-level') || '0');
+
+                if (date && contributions[date]) {
+                  contributions[date].dataLevel = dataLevel;
+                }
+              } else {
+                const text = $(this).text().trim();
+                const match = text.match(/(\d+)\s+contributions?\s+on\s+([\w\s\d]+)/);
+
+                if (match) {
+                  const amount = parseInt(match[1]);
+                  const dateText = match[2];
+
+                  const parsedDate = parseDateText(dateText, year);
+
+                  if (parsedDate && contributions[parsedDate]) {
+                    contributions[parsedDate].amount = amount;
+                  }
+                }
+              }
+            });
+
+          const resultArray = Object.values(contributions).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+          const result = {
+            username: username,
+            year: year,
+            daily_contributions: resultArray,
+          };
+
+          $('#output').text(JSON.stringify(result, null, 2));
+        } catch (error) {
+          console.error('Error fetching data:', error);
+          $('#output').text('Failed to fetch data.');
+        }
+      }
+    });
+  </script>
+</body>
+
+</html>
