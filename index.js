@@ -5,7 +5,7 @@ const cheerio = require('cheerio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/', async (res) => {
+app.get('/', async (req, res) => {
   res.status(200).send('Alive!');
 });
 
