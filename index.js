@@ -5,6 +5,10 @@ const cheerio = require('cheerio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.get('/', async (res) => {
+  res.status(200).send('Alive!');
+});
+
 app.get('/contributions', async (req, res) => {
   const { username, year } = req.query;
 
