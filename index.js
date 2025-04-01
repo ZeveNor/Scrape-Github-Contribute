@@ -1,9 +1,16 @@
 const express = require('express');
 const axios = require('axios');
+const cors = require('cors');
 const cheerio = require('cheerio');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3200;
+
+app.use(cors({
+  origin: 'http://127.0.0.1:3000', 
+}));
+
+const cache = {};
 
 app.get('/', async (req, res) => {
   res.status(200).send('Alive!');
@@ -14,6 +21,12 @@ app.get('/contributions', async (req, res) => {
 
   if (!username || !year) {
     return res.status(400).json({ error: 'Please provide both username and year.' });
+  }
+
+  const cacheKey = `${username}-${year}`;
+
+  if (cache[cacheKey] && (Date.now() - cache[cacheKey].timestamp < 3600000)) {
+    return res.json(cache[cacheKey].data);
   }
 
   const url = `https://github.com/users/${username}/contributions?tab=overview&from=${year}-01-01&to=${year}-12-31`;
@@ -48,6 +61,10 @@ app.get('/contributions', async (req, res) => {
     });
 
     const resultArray = Object.values(contributions).sort((a, b) => new Date(a.date) - new Date(b.date));
+    cache[cacheKey] = {
+      data: { username, year, daily_contributions: resultArray },
+      timestamp: Date.now(), 
+    };
     res.json({ username, year, daily_contributions: resultArray });
   } catch (error) {
     console.error('Error fetching data:', error);
